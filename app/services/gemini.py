@@ -21,17 +21,25 @@ profiles = None
 
 try:
     client = genai.Client(api_key=GEMINI_API_KEY)
+except Exception as e:
+    print(f"⚠️ Error inicializando cliente Gemini: {e}")
+    client = None
 
-    if ENABLE_MEMORY:
+if ENABLE_MEMORY:
+    try:
         from app.services.brain.memory_service import MemoryService
         memory = MemoryService()
+    except BaseException as e:
+        print(f"⚠️ Memoria episódica desactivada (ChromaDB falló): {e}")
+        memory = None
 
-    if ENABLE_MULTI_PROFILES:
+if ENABLE_MULTI_PROFILES:
+    try:
         from app.services.brain.profile_service import MultiUserProfileService
         profiles = MultiUserProfileService()
-
-except Exception as e:
-    print(f"⚠️ Error inicializando servicios de cerebro: {e}")
+    except BaseException as e:
+        print(f"⚠️ Perfiles multi-usuario desactivados: {e}")
+        profiles = None
 
 # Memoria a corto plazo
 history_chat: deque[str] = deque(maxlen=10)
