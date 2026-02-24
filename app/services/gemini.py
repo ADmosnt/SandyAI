@@ -7,6 +7,7 @@ from collections import deque
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
+from app.core.personality import build_system_prompt
 
 load_dotenv()
 
@@ -20,15 +21,15 @@ profiles = None
 
 try:
     client = genai.Client(api_key=GEMINI_API_KEY)
-    
+
     if ENABLE_MEMORY:
         from app.services.brain.memory_service import MemoryService
         memory = MemoryService()
-    
+
     if ENABLE_MULTI_PROFILES:
         from app.services.brain.profile_service import MultiUserProfileService
         profiles = MultiUserProfileService()
-        
+
 except Exception as e:
     print(f"⚠️ Error inicializando servicios de cerebro: {e}")
 
@@ -39,20 +40,8 @@ history_chat: deque[str] = deque(maxlen=10)
 _turn_counter = 0
 EXTRACT_EVERY_N_TURNS = 5
 
-SYSTEM_PROMPT = """
-Eres Sandy, una asistente de IA avanzada.
-
-PERSONALIDAD:
-- Sarcástica pero eficiente
-- Técnica y directa
-- Memoria perfecta (usas el perfil del usuario y recuerdos pasados cuando están disponibles)
-
-REGLAS:
-- NO menciones explícitamente "según mi base de datos" o "recuerdo que..."
-- Actúa como si naturalmente lo recordaras
-- Usa el perfil del usuario para personalizar respuestas
-- Respuestas concisas y conversacionales
-"""
+# System prompt generado desde personality.json
+SYSTEM_PROMPT = build_system_prompt()
 
 def query_gemini_stream(text: str, speaker_id: str = None):
     """
