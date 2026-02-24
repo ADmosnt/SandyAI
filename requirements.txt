@@ -1,3 +1,20 @@
+# ============================================================
+# PyTorch: instalar ANTES de este archivo.
+#
+# RTX 5060 Ti (Blackwell, sm_120) necesita CUDA 12.8+.
+# PyTorch estable aun no tiene soporte completo para sm_120,
+# asi que usa nightly:
+#
+#   pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu128
+#
+# Si tienes otra GPU (Ampere/Ada), puedes usar estable:
+#
+#   pip install torch==2.10.0 torchvision==0.25.0 torchaudio==2.10.0 --index-url https://download.pytorch.org/whl/cu128
+#
+# Despues de instalar PyTorch:
+#   pip install -r requirements.txt
+# ============================================================
+
 absl-py==2.3.1
 aiofiles==24.1.0
 aiohappyeyeballs==2.6.1
@@ -129,7 +146,7 @@ pynndescent==0.5.13
 pyparsing==3.2.3
 PyPika==0.48.9
 pyproject_hooks==1.2.0
-pyreadline3==3.5.4
+pyreadline3==3.5.4  # solo Windows
 pysbd==0.3.4
 python-crfsuite==0.9.11
 python-dateutil==2.9.0.post0
@@ -172,9 +189,7 @@ termcolor==3.1.0
 thinc==8.2.5
 threadpoolctl==3.6.0
 tokenizers==0.21.2
-torch==2.4.1+cu118
-torchaudio==2.4.1+cu118
-torchvision==0.19.1+cu118
+# torch, torchaudio, torchvision: ver instrucciones al inicio del archivo
 tqdm==4.67.1
 transformers==4.53.2
 typeguard==4.4.4
@@ -188,9 +203,7 @@ urllib3==2.5.0
 wasabi==1.1.3
 weasel==0.4.1
 webrtcvad-wheels==2.0.14
-websocket-client==1.8.0
-websockets==15.0.1
-Werkzeug==3.1.3
+# websocket-client, websockets, Werkzeug: eliminados (eran de Twitch/Flask)
 wrapt==1.17.2
 yarl==1.20.1
 zipp==3.23.0

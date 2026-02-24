@@ -167,6 +167,7 @@ class ListeningService:
             "avg_volume": float(avg_volume) if avg_volume is not None else None,
             "max_volume": float(vol_max) if vol_max is not None else None,
             "duration_s": float(duration_s) if duration_s is not None else None,
+            "captured_at": time.time(),
         }
 
         if self.speaker_service is not None:

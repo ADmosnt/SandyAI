@@ -1,6 +1,4 @@
 from speechbrain.inference import SpeakerRecognition
-import os
-import shutil
 
 def download_model():
     print("⬇️ Descargando modelo de voz para uso OFFLINE...")
