@@ -57,6 +57,25 @@ LATENTS_PATH = os.getenv("TTS_LATENTS_PATH", "sandy_latents.pt")
 FORCE_REBUILD_LATENTS = os.getenv("TTS_LATENTS_FORCE_REBUILD", "0") == "1"
 
 
+def _cuda_is_usable():
+    """Check if CUDA is available AND actually works for computation.
+    Catches cases where the GPU architecture (e.g. sm_120/Blackwell)
+    is not supported by the installed PyTorch build."""
+    if not torch.cuda.is_available():
+        return False
+    try:
+        x = torch.zeros(1, device="cuda")
+        _ = (x + 1).item()
+        return True
+    except Exception as e:
+        gpu_name = torch.cuda.get_device_name(0)
+        print(f"   ⚠️ CUDA detectado ({gpu_name}) pero no funcional para compute:")
+        print(f"      {e}")
+        print(f"   ↳ Usando CPU como fallback. Para GPU, instala PyTorch con cu128:")
+        print(f"     pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu128")
+        return False
+
+
 def check_vram():
     if torch.cuda.is_available():
         used = torch.cuda.memory_allocated() / 1024**3
@@ -228,7 +247,8 @@ def _fade_in_out(audio: np.ndarray, sr: int, ms: int = 6) -> np.ndarray:
 
 class TTSService:
     def __init__(self):
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+        device = "cuda" if _cuda_is_usable() else "cpu"
+        self._device = device
         print(f"🔊 Configurando Voz en {device.upper()}... (ID: {SPEAKER_INDEX})")
 
         os.environ["COQUI_TOS_AGREED"] = "1"
@@ -378,16 +398,16 @@ class TTSService:
     def _warmup_model(self):
         print("   ↳ [Warmup] Preparando motor TTS...")
         try:
-            if torch.cuda.is_available():
+            if self._device == "cuda":
                 torch.zeros((1,), device="cuda")
                 torch.cuda.synchronize()
 
             _ = self._synthesize("Hola.")
-            if torch.cuda.is_available():
+            if self._device == "cuda":
                 torch.cuda.synchronize()
 
             _ = self._synthesize("Probando.")
-            if torch.cuda.is_available():
+            if self._device == "cuda":
                 torch.cuda.synchronize()
 
             print("   ✅ [Warmup] Listo.")
@@ -456,7 +476,7 @@ class TTSService:
         elif audio.ndim == 2 and audio.shape[1] != 1:
             audio = audio[:, :1]
 
-        if torch.cuda.is_available() and EMPTY_CACHE_EACH_CHUNK:
+        if self._device == "cuda" and EMPTY_CACHE_EACH_CHUNK:
             torch.cuda.empty_cache()
 
         return audio
@@ -661,7 +681,7 @@ class TTSService:
             p = next(self._xtts_model.parameters())
             return p.device, p.dtype
         except Exception:
-            dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            dev = torch.device(self._device)
             return dev, torch.float16 if dev.type == "cuda" else torch.float32
 
     def _move_latents_to_model_device(self):
