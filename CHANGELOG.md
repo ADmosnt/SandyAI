@@ -60,6 +60,47 @@ para mantener compatibilidad de dimensiones con el modelo anterior.
 
 **Archivo:** `memory_service.py`
 
+### Problema 5: torchaudio.info y torchaudio.save eliminados
+
+**Error:** `AttributeError: module 'torchaudio' has no attribute 'info'`
+
+**Causa:** torchaudio nightly tambien elimino `.info` y posiblemente `.save`.
+
+**Solucion:** Solo se parchea `.load` (siempre existe). `.save` se parchea con
+`hasattr` guard. `.info` se omitio.
+
+**Archivo:** `speaker_service.py`
+
+### Problema 6: torchaudio.load ignora parametro backend en nightly
+
+**Error:** `TorchCodec is required for load_with_torchcodec` a pesar de pasar
+`backend="soundfile"` a torchaudio.load().
+
+**Causa:** torchaudio nightly ignora el parametro `backend` y llama
+`load_with_torchcodec` directamente en su dispatch interno.
+
+**Solucion:** Se reemplazo `torchaudio.load` completamente con una
+implementacion directa que usa `soundfile.read()` (libreria `soundfile`).
+Retorna el mismo formato `(tensor, samplerate)` que torchaudio.
+
+**Archivo:** `speaker_service.py`
+
+### Problema 7: Audio TTS ininteligible en Blackwell (sm_120)
+
+**Error:** XTTS generaba audio ininteligible y lento (~14s por chunk).
+
+**Causa:** SpeechBrain activa `allow_tf32` como quirk global al importarse.
+TF32 reduce la precision de float32 (mantissa de 23 a 10 bits). En Blackwell
+(sm_120), esta reduccion causa degradacion severa en la calidad de audio de XTTS.
+Los speaker latents calculados con TF32 activo tambien quedan contaminados.
+
+**Solucion:** Se desactiva TF32 (`torch.backends.cuda.matmul.allow_tf32 = False`
+y `torch.backends.cudnn.allow_tf32 = False`) antes de cargar XTTS. Controlable
+con `TTS_DISABLE_TF32=1` (default ON). Al cambiar, borrar `sandy_latents.pt`
+para forzar recalculo de latents con precision completa.
+
+**Archivo:** `tts_service.py`
+
 ### Comandos de instalacion (referencia)
 
 ```bash

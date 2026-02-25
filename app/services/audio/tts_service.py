@@ -57,6 +57,7 @@ EMPTY_CACHE_EACH_CHUNK = os.getenv("TTS_EMPTY_CACHE_EACH_CHUNK", "0") == "1"
 
 LATENTS_PATH = os.getenv("TTS_LATENTS_PATH", "sandy_latents.pt")
 FORCE_REBUILD_LATENTS = os.getenv("TTS_LATENTS_FORCE_REBUILD", "0") == "1"
+DISABLE_TF32 = os.getenv("TTS_DISABLE_TF32", "1") == "1"  # default ON — Blackwell + XTTS fix
 
 
 class CUDAIncompatibleError(RuntimeError):
@@ -294,6 +295,14 @@ class TTSService:
         device = "cuda"
         self._device = device
         print(f"🔊 Configurando Voz en {device.upper()}... (ID: {SPEAKER_INDEX})")
+
+        # SpeechBrain activa TF32 como quirk global. Esto reduce la precisión
+        # de float32 (mantissa 23→10 bits) y en Blackwell causa audio
+        # ininteligible en XTTS. Lo desactivamos antes de cargar el modelo.
+        if DISABLE_TF32:
+            torch.backends.cuda.matmul.allow_tf32 = False
+            torch.backends.cudnn.allow_tf32 = False
+            print("   ↳ [TF32] Desactivado (precisión completa para XTTS)")
 
         os.environ["COQUI_TOS_AGREED"] = "1"
 
