@@ -11,6 +11,7 @@ import unicodedata
 
 import numpy as np
 import torch
+import soundfile as sf
 import torchaudio
 from dotenv import load_dotenv
 
@@ -18,23 +19,21 @@ from dotenv import load_dotenv
 if not hasattr(torchaudio, "list_audio_backends"):
     torchaudio.list_audio_backends = lambda: ["soundfile"]
 
-# --- Patch: force soundfile backend (torchaudio nightly defaults to torchcodec which needs FFmpeg DLLs on Windows) ---
-_orig_ta_load = torchaudio.load
+# --- Patch: bypass torchaudio's torchcodec dispatch entirely ---
+# torchaudio nightly (2.11+) forces torchcodec which needs FFmpeg DLLs.
+# We replace torchaudio.load with a direct soundfile implementation.
+def _direct_sf_load(filepath, frame_offset=0, num_frames=-1,
+                    normalize=True, channels_first=True, **_kw):
+    start = frame_offset if frame_offset > 0 else 0
+    stop = (start + num_frames) if num_frames > 0 else None
+    data, samplerate = sf.read(str(filepath), start=start, stop=stop,
+                               dtype="float32", always_2d=True)
+    tensor = torch.from_numpy(data.copy())   # (samples, channels)
+    if channels_first:
+        tensor = tensor.T                    # (channels, samples)
+    return tensor, samplerate
 
-def _sf_load(filepath, *args, **kwargs):
-    kwargs.setdefault("backend", "soundfile")
-    return _orig_ta_load(filepath, *args, **kwargs)
-
-torchaudio.load = _sf_load
-
-if hasattr(torchaudio, "save"):
-    _orig_ta_save = torchaudio.save
-
-    def _sf_save(filepath, *args, **kwargs):
-        kwargs.setdefault("backend", "soundfile")
-        return _orig_ta_save(filepath, *args, **kwargs)
-
-    torchaudio.save = _sf_save
+torchaudio.load = _direct_sf_load
 
 from speechbrain.inference import SpeakerRecognition
 
