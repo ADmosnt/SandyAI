@@ -11,7 +11,13 @@ import unicodedata
 
 import numpy as np
 import torch
+import torchaudio
 from dotenv import load_dotenv
+
+# --- Patch: torchaudio nightly removed list_audio_backends(), speechbrain still needs it ---
+if not hasattr(torchaudio, "list_audio_backends"):
+    torchaudio.list_audio_backends = lambda: ["ffmpeg"]
+
 from speechbrain.inference import SpeakerRecognition
 
 load_dotenv()
