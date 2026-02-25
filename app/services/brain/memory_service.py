@@ -28,8 +28,9 @@ class MemoryService:
         """Genera embedding usando Gemini"""
         try:
             result = self.client.models.embed_content(
-                model="text-embedding-004",
-                contents=text
+                model="gemini-embedding-001",
+                contents=text,
+                config={"output_dimensionality": 768},
             )
             return result.embeddings[0].values
         except Exception as e:

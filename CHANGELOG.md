@@ -1,5 +1,80 @@
 # CHANGELOG - SandyAI
 
+## [1.0.1] - 2026-02-25 - Compatibilidad PyTorch nightly cu128 + RTX 5060 Ti
+
+### Contexto
+
+Se migro de PyTorch estable (cu118) a PyTorch nightly cu128 para soportar la
+arquitectura Blackwell (sm_120) de la RTX 5060 Ti. Esto introdujo varias
+incompatibilidades con dependencias que se resolvieron aqui.
+
+### Problema 1: CUDA fallback silencioso a CPU
+
+**Error:** Sandy caia silenciosamente a CPU cuando CUDA no funcionaba, haciendo
+que todo corriera extremadamente lento sin explicacion.
+
+**Solucion:** Se reemplazo el fallback a CPU por un error fatal con diagnostico
+claro. Ahora Sandy se detiene si CUDA no funciona y muestra:
+- Nombre de GPU y arquitectura (ej. `RTX 5060 Ti sm_120`)
+- Version de PyTorch instalada
+- Comandos exactos para instalar la version correcta
+- Log completo en `logs/cuda_errors.log`
+
+**Archivos:** `tts_service.py`, `listening_service.py`, `main_local.py`
+
+### Problema 2: torchaudio.list_audio_backends() eliminado
+
+**Error:** `AttributeError: module 'torchaudio' has no attribute 'list_audio_backends'`
+al importar speechbrain.
+
+**Causa:** torchaudio nightly (2.11.0.dev) elimino `list_audio_backends()` pero
+speechbrain 1.0.2 lo llama al importarse.
+
+**Solucion:** Shim en `speaker_service.py` que crea la funcion si no existe.
+
+**Archivo:** `speaker_service.py`
+
+### Problema 3: torchcodec requiere FFmpeg DLLs en Windows
+
+**Error:** `Could not load libtorchcodec. FFmpeg is not properly installed...`
+en cada llamada a TTS y speaker embedding.
+
+**Causa:** torchaudio nightly cambio su backend de audio por defecto de
+`soundfile` a `torchcodec`, que necesita FFmpeg shared libraries (DLLs).
+En Windows no vienen preinstaladas.
+
+**Solucion:** Monkey-patch en `speaker_service.py` que fuerza el backend
+`soundfile` para `torchaudio.load()`, `torchaudio.info()` y `torchaudio.save()`.
+soundfile ya estaba instalado como dependencia y no necesita FFmpeg.
+
+**Archivo:** `speaker_service.py`
+
+### Problema 4: Modelo de embedding deprecado (404)
+
+**Error:** `404 NOT_FOUND: models/text-embedding-004 is not found for API version v1beta`
+
+**Causa:** Google depreco `text-embedding-004` el 14 de enero 2026.
+
+**Solucion:** Migrado a `gemini-embedding-001` con `output_dimensionality=768`
+para mantener compatibilidad de dimensiones con el modelo anterior.
+
+**Archivo:** `memory_service.py`
+
+### Comandos de instalacion (referencia)
+
+```bash
+# Desinstalar PyTorch viejo
+pip uninstall torch torchvision torchaudio -y
+
+# Instalar nightly cu128 (requerido para RTX 50XX Blackwell)
+pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu128
+
+# torchcodec no es necesario (se usa soundfile como backend)
+pip uninstall torchcodec -y
+```
+
+---
+
 ## [1.0.0] - 2026-02-24 - Limpieza y consolidacion del proyecto
 
 ### Contexto: Analisis de codigo legado

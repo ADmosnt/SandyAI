@@ -16,7 +16,28 @@ from dotenv import load_dotenv
 
 # --- Patch: torchaudio nightly removed list_audio_backends(), speechbrain still needs it ---
 if not hasattr(torchaudio, "list_audio_backends"):
-    torchaudio.list_audio_backends = lambda: ["ffmpeg"]
+    torchaudio.list_audio_backends = lambda: ["soundfile"]
+
+# --- Patch: force soundfile backend (torchaudio nightly defaults to torchcodec which needs FFmpeg DLLs on Windows) ---
+_orig_ta_load = torchaudio.load
+_orig_ta_info = torchaudio.info
+_orig_ta_save = torchaudio.save
+
+def _sf_load(filepath, *args, **kwargs):
+    kwargs.setdefault("backend", "soundfile")
+    return _orig_ta_load(filepath, *args, **kwargs)
+
+def _sf_info(filepath, *args, **kwargs):
+    kwargs.setdefault("backend", "soundfile")
+    return _orig_ta_info(filepath, *args, **kwargs)
+
+def _sf_save(filepath, *args, **kwargs):
+    kwargs.setdefault("backend", "soundfile")
+    return _orig_ta_save(filepath, *args, **kwargs)
+
+torchaudio.load = _sf_load
+torchaudio.info = _sf_info
+torchaudio.save = _sf_save
 
 from speechbrain.inference import SpeakerRecognition
 
