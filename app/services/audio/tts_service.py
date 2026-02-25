@@ -2,6 +2,8 @@
 
 import time
 import os
+import logging
+import traceback
 import threading
 import queue
 import re
@@ -57,23 +59,64 @@ LATENTS_PATH = os.getenv("TTS_LATENTS_PATH", "sandy_latents.pt")
 FORCE_REBUILD_LATENTS = os.getenv("TTS_LATENTS_FORCE_REBUILD", "0") == "1"
 
 
-def _cuda_is_usable():
-    """Check if CUDA is available AND actually works for computation.
-    Catches cases where the GPU architecture (e.g. sm_120/Blackwell)
-    is not supported by the installed PyTorch build."""
+class CUDAIncompatibleError(RuntimeError):
+    """GPU detected but PyTorch lacks compiled kernels for this architecture."""
+    pass
+
+
+# --- Error log ---
+os.makedirs("logs", exist_ok=True)
+_error_logger = logging.getLogger("sandy.cuda")
+_error_logger.setLevel(logging.DEBUG)
+_fh = logging.FileHandler("logs/cuda_errors.log", encoding="utf-8")
+_fh.setFormatter(logging.Formatter("%(asctime)s | %(levelname)s | %(message)s"))
+_error_logger.addHandler(_fh)
+
+
+_cuda_checked = False
+
+
+def _check_cuda_or_die():
+    """Verify CUDA is available AND functional. Raises CUDAIncompatibleError if not."""
+    global _cuda_checked
+    if _cuda_checked:
+        return True
+
     if not torch.cuda.is_available():
-        return False
+        msg = "CUDA no está disponible. Instala los drivers NVIDIA y CUDA Toolkit 12.8+."
+        _error_logger.error(msg)
+        raise CUDAIncompatibleError(msg)
+
+    gpu_name = torch.cuda.get_device_name(0)
+    cuda_arch = torch.cuda.get_device_capability(0)
+    arch_str = f"sm_{cuda_arch[0]}{cuda_arch[1]}0"
+
     try:
         x = torch.zeros(1, device="cuda")
         _ = (x + 1).item()
-        return True
     except Exception as e:
-        gpu_name = torch.cuda.get_device_name(0)
-        print(f"   ⚠️ CUDA detectado ({gpu_name}) pero no funcional para compute:")
-        print(f"      {e}")
-        print(f"   ↳ Usando CPU como fallback. Para GPU, instala PyTorch con cu128:")
-        print(f"     pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu128")
-        return False
+        full_error = traceback.format_exc()
+        _error_logger.error(
+            f"CUDA incompatible: GPU={gpu_name} arch={arch_str}\n"
+            f"PyTorch={torch.__version__}\n"
+            f"{full_error}"
+        )
+        print()
+        print(f"   ❌ ERROR: Tu {gpu_name} ({arch_str}) no es compatible con este PyTorch ({torch.__version__})")
+        print(f"   ↳ Detalle completo en: logs/cuda_errors.log")
+        print()
+        print(f"   SOLUCIÓN:")
+        print(f"     1. pip uninstall torch torchvision torchaudio -y")
+        print(f"     2. pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu128")
+        print()
+        raise CUDAIncompatibleError(
+            f"{gpu_name} ({arch_str}) no soportado por PyTorch {torch.__version__}. "
+            f"Ver logs/cuda_errors.log"
+        ) from e
+
+    _error_logger.info(f"CUDA OK: GPU={gpu_name} arch={arch_str} torch={torch.__version__}")
+    _cuda_checked = True
+    return True
 
 
 def check_vram():
@@ -247,7 +290,8 @@ def _fade_in_out(audio: np.ndarray, sr: int, ms: int = 6) -> np.ndarray:
 
 class TTSService:
     def __init__(self):
-        device = "cuda" if _cuda_is_usable() else "cpu"
+        _check_cuda_or_die()
+        device = "cuda"
         self._device = device
         print(f"🔊 Configurando Voz en {device.upper()}... (ID: {SPEAKER_INDEX})")
 

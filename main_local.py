@@ -15,7 +15,7 @@ from typing import Any, Dict, Optional, Tuple
 from dotenv import load_dotenv
 
 from app.services.audio.listening_service import ListeningService
-from app.services.audio.tts_service import TTSService
+from app.services.audio.tts_service import TTSService, CUDAIncompatibleError
 
 from app.services import gemini as brain
 from app.services.brain.intent_detector import IntentDetector
@@ -817,6 +817,10 @@ def main():
 
     except KeyboardInterrupt:
         print("\n\n🛑 Apagando Sandy...")
+
+    except CUDAIncompatibleError:
+        print("\n🛑 Sandy no puede arrancar sin GPU compatible.")
+        print("   Revisa logs/cuda_errors.log para más detalles.\n")
 
     except Exception as e:
         print("\n💥 ERROR:")

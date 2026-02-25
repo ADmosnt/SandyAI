@@ -22,22 +22,7 @@ except ImportError:
 load_dotenv()
 
 
-def _cuda_is_usable():
-    """Check if CUDA is available AND actually works for computation.
-    Catches cases where the GPU architecture (e.g. sm_120/Blackwell)
-    is not supported by the installed PyTorch build."""
-    if not torch.cuda.is_available():
-        return False
-    try:
-        x = torch.zeros(1, device="cuda")
-        _ = (x + 1).item()
-        return True
-    except Exception as e:
-        gpu_name = torch.cuda.get_device_name(0)
-        print(f"   ⚠️ CUDA detectado ({gpu_name}) pero no funcional para compute:")
-        print(f"      {e}")
-        print(f"   ↳ Whisper usará CPU. Para GPU, instala PyTorch con cu128.")
-        return False
+from app.services.audio.tts_service import _check_cuda_or_die, CUDAIncompatibleError
 
 
 CHUNK = 4096
@@ -55,11 +40,10 @@ class ListeningService:
     def __init__(self):
         print(f"🎧 Configurando Oído... (Mic ID: {MIC_INDEX} | Threshold: {THRESHOLD})")
 
-        device = "cuda" if _cuda_is_usable() else "cpu"
-        compute_type = "float16" if device == "cuda" else "int8"
+        _check_cuda_or_die()
         try:
-            self.model = WhisperModel("medium", device=device, compute_type=compute_type)
-            print(f"✅ Modelo Whisper cargado en {device.upper()}.")
+            self.model = WhisperModel("medium", device="cuda", compute_type="float16")
+            print("✅ Modelo Whisper cargado en CUDA.")
         except Exception as e:
             print(f"❌ Error Whisper: {e}")
             raise
